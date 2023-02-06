@@ -1,0 +1,244 @@
+@page "/TestMap"
+@using ObjectOrientedTestsCasesPrototype.Model
+@using ObjectOrientedTestsCasesPrototype.Components
+@using Microsoft.EntityFrameworkCore
+
+@inject NavigationManager _navigator
+
+@if (CurrentTestMap is null)
+{
+    <p>Loading...</p>
+}
+
+else
+{
+    <div class="container">
+        <div class="row bottom-margined">
+            <div class="col">
+                @if (IsNameEditMode)
+                {
+                    <input type="text" class="d-inline form-control w-300" id="mapName" @bind="CurrentTestMap.MapName" required="required">
+                    
+                    <button class="d-inline btn btn-secondary ml-8" @onclick="() => IsNameEditMode = false">
+                        <span class="oi oi-check"></span>
+                    </button>
+                }
+                else
+                {
+                    <h4 class="d-inline">@CurrentTestMap.MapName</h4>
+                
+                    <button class="d-inline btn btn-secondary ml-8" @onclick="() => IsNameEditMode = true">
+                        <span class="oi oi-pencil"></span>
+                    </button>
+                }
+            </div>
+
+            <div class="col-auto">
+                <div class="p-2 d-inline align-items-center">
+                    <span>V</span>@CurrentTestMap.MapVersion
+                </div>
+                
+                <button class="btn btn-danger" @onclick="DeleteTestMap">
+                    <span>&times;</span>
+                </button>
+            </div>
+        </div>
+    
+        <div class="row both-margined">
+            <label class="col-auto">Comment</label>
+            
+            <div class="col">
+                <textarea type="text" class="form-control" @bind="CurrentTestMap.Comment"></textarea>
+            </div>
+        </div>
+    
+        <div class="row both-margined">
+            <div class="col">
+                <h4>Test Cases</h4>
+            </div>
+            
+            <div class="col-auto mr-0">
+                <button class="btn btn-primary" @onclick="() => _areTestCasesCollapsed = !_areTestCasesCollapsed">
+                    <span class="oi @TestCaseClasses.Item2"></span>
+                </button>
+                
+                <button class="btn btn-primary" @onclick="AddTestCase">
+                    New Test Case
+                </button>
+            </div>
+        </div>
+
+        <div class="row bottom-margined @TestCaseClasses.Item1">
+            <div class="row">
+                <div class="col-2">
+                    <span class="fw-bold">Type</span>
+                </div>
+    
+                <div class="col">
+                    <span class="fw-bold">Test Case Description</span>
+                </div>
+    
+                <div class="col-3">
+                    <span class="fw-bold">Expected Result</span>
+                </div>
+                
+                <div class="col-3">
+                    <span class="fw-bold">Comments</span>
+                </div>
+                
+                <div class="col-auto">
+                    <div class="fw-bold" style="width: 37px">Do</div>
+                </div>
+            </div>
+            
+            @if (CurrentTestMap.TestCases.Count == 0)
+            {
+                <div class="fs-20 p-2 mb-2 mt-2 border rounded">There're no test cases</div>
+            }
+            else
+            {
+                foreach (var testCase in CurrentTestMap.TestCases)
+                {
+                    <TestCaseView 
+                        CurrentTestCase="testCase" 
+                        OnDeletedAction="StateHasChanged" />
+                }
+            }
+        </div>
+    
+        <div class="row both-margined">
+            <div class="col">
+                <h4>Inherited Test Cases</h4>
+            </div>
+            
+            <div class="col-auto">
+                <select class="d-inline form-control w-auto" @bind="ToAddTestMapId">
+                    @foreach (var testMap in OrmManager.Context.TestMaps)
+                    {
+                        <option value="@testMap.MapId">@testMap.MapName</option>
+                    }
+                </select>
+                
+                <button class="d-inline btn btn-primary ml-8" @onclick="AddTestMap">
+                    <span class="oi oi-plus"></span>
+                </button>
+            </div>
+        </div>
+    
+        <div class="row both-margined">
+            @foreach (var inherition in CurrentTestMap.TestMapInheritionContainerTestMaps)
+            {
+                <TestMapView 
+                    CurrentMapId="inherition.HoldedTestMapId" 
+                    CanOverrideTestCases="true"
+                    OnOverrodeTestCaseAction="OnOverrodeTestCase"
+                    OnRemovedTestMap="OnRemovedTestMap" />
+            }
+        </div>
+    </div>
+}
+
+
+
+@code {
+    private int _currentMapId;
+
+    [Parameter]
+    [SupplyParameterFromQuery]
+    public int CurrentMapId
+    {
+        get => _currentMapId;
+        set
+        {
+            _currentMapId = value;
+            LoadTestMap();
+        }
+    }
+
+    private TestMap? CurrentTestMap { get; set; }
+    private bool IsNameEditMode { get; set; } = false;
+    private int ToAddTestMapId { get; set; }
+
+    private bool _areTestCasesCollapsed = false;
+    private (string, string) TestCaseClasses => _areTestCasesCollapsed ? ("collapse", "oi-chevron-top") : (string.Empty, "oi-chevron-bottom");
+    
+    private void LoadTestMap()
+    {
+        var testMap = OrmManager.Context.TestMaps
+            .Where(m => m.MapId == CurrentMapId)
+            .Include(t => t.TestCases)
+            .Include(t => t.TestMapInheritionContainerTestMaps);
+
+        if (!testMap.Any())
+        {
+            _navigator.NavigateTo("/NewTestMap");
+            return;
+        }
+
+        CurrentTestMap = testMap.First();
+    }
+
+    private void DeleteTestMap()
+    {
+        throw new NotImplementedException();
+    }
+
+    private void AddTestCase()
+    {
+        var testCase = new TestCase()
+        {
+            Type = OrmManager.Context.TestingTypes.First(),
+            CheckText = string.Empty,
+            ExpectedResult = string.Empty,
+        };
+        
+        CurrentTestMap.TestCases.Add(testCase);
+        OrmManager.Context.SaveChanges();
+    }
+
+    private void AddTestMap()
+    {
+        if (ToAddTestMapId == 0)
+        {
+            return;
+        }
+
+        var testMap = OrmManager.Context.TestMaps.Single(m => m.MapId == ToAddTestMapId);
+        var inherition = new TestMapInherition()
+        {
+            ContainerTestMap = CurrentTestMap,
+            HoldedTestMap = testMap,
+        };
+        
+        CurrentTestMap.TestMapInheritionContainerTestMaps.Add(inherition);
+        OrmManager.Context.SaveChanges();
+    }
+    
+    private void OnOverrodeTestCase(TestCase overridingTestCase)
+    {
+        var childTestCase = new TestCase()
+        {
+            Type = overridingTestCase.Type,
+            CheckText = overridingTestCase.CheckText,
+            ExpectedResult = overridingTestCase.ExpectedResult,
+            Comment = overridingTestCase.Comment,
+            OverridedCase = overridingTestCase,
+        };
+        
+        CurrentTestMap.TestCases.Add(childTestCase);
+        OrmManager.Context.SaveChanges();
+        StateHasChanged();
+    }
+
+    private void OnRemovedTestMap(TestMap testMap)
+    {
+        var inherition = OrmManager.Context.TestMapInheritions.Single(i => 
+            i.ContainerTestMapId == CurrentTestMap.MapId && 
+            i.HoldedTestMapId == testMap.MapId);
+
+        OrmManager.Context.TestMapInheritions.Remove(inherition);
+        OrmManager.Context.SaveChanges();
+        StateHasChanged();
+    }
+
+}

@@ -1,0 +1,10 @@
+<div class="alert alert-danger @CollapsedClass" role="alert">
+    @Message
+</div>
+
+@code {
+    [Parameter] public bool IsVisible { get; set; } = false;
+    [Parameter] public string Message { get; set; } = string.Empty;
+
+    private string CollapsedClass => IsVisible ? string.Empty : "collapse";
+}

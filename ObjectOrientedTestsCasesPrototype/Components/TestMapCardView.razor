@@ -1,0 +1,86 @@
+@using ObjectOrientedTestsCasesPrototype.Model
+
+@inject IJSRuntime JsRuntime
+@inject NavigationManager _navigator
+
+@if (TestMap is null)
+{
+    <div>Loading...</div>
+}
+else
+{
+    <div class="bordered-block">
+        <div class="row no-margin">
+            <div class="row no-margin no-padding">
+                <div class="col">
+                    <button class="btn btn-primary d-inline" @onclick="@(() => _navigator.NavigateTo($"/TestMap?CurrentMapId={TestMap.MapId}"))">
+                        Open
+                    </button>
+                
+                    <div class="d-inline p-2 fs-20b">@TestMap.MapName</div>
+                </div>
+
+                <div class="col-auto justify-content-end">
+                    <div class="p-2 d-inline align-items-center">
+                        <span>V</span>@TestMap.MapVersion
+                    </div>
+                
+                    <button class="btn btn-secondary" @onclick="() => { _isCollapsed = !_isCollapsed; _showComment = !_showComment; }">
+                        @ShowComment Comment
+                    </button>
+                
+                    <button class="btn btn-danger" @onclick="DeleteTestMap">
+                        <span>&times;</span>
+                    </button>
+                </div>
+            </div>
+        
+            <div class="pos-f-t">
+                <div class="@CollapseClass" id="navbarToggleExternalContent">
+                    <div class="p-4">
+                        <p class="no-margin">@TestMap.Comment</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public TestMap? TestMap { get; set; }
+    [Parameter] public Action? OnDeletedAction { get; set; }
+
+    private bool _isCollapsed = true;
+    private string CollapseClass => _isCollapsed ? "collapse" : string.Empty;
+
+    private bool _showComment = true;
+    private string ShowComment => _showComment ? "Show" : "Hide";
+    
+    private async Task DeleteTestMap()
+    {
+        if (TestMap is null)
+        {
+            return;
+        }
+        
+        var confirmed = await JsRuntime.InvokeAsync<bool>("confirm", "Are you sure?");
+        if (confirmed)
+        {
+            var testCasesPredicate = new Func<TestCase, bool>(tc => tc.TestMapId == TestMap.MapId);
+            var inheritionsPredicate = new Func<TestMapInherition, bool>(i => 
+                i.ContainerTestMapId == TestMap.MapId || 
+                i.HoldedTestMapId == TestMap.MapId);
+            
+            var assignedInheritions = OrmManager.Context.TestMapInheritions.Where(inheritionsPredicate);
+            var assignedTestCases = OrmManager.Context.TestCases.Where(testCasesPredicate);
+            
+            OrmManager.Context.TestMapInheritions.RemoveRange(assignedInheritions);
+            OrmManager.Context.TestCases.RemoveRange(assignedTestCases);
+            
+            OrmManager.Context.TestMaps.Remove(TestMap);
+            OrmManager.Context.SaveChanges();
+            
+            OnDeletedAction?.Invoke();
+        }
+    }
+}

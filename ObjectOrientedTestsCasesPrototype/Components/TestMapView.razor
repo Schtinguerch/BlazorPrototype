@@ -1,0 +1,99 @@
+@using ObjectOrientedTestsCasesPrototype.Components
+@using ObjectOrientedTestsCasesPrototype.Model
+@using Microsoft.EntityFrameworkCore
+
+@inject NavigationManager _navigator
+
+@if (CurrentTestMap is null)
+{
+    <p>Loading...</p>
+}
+else
+{
+    <div class="border rounded bottom-double-margined">
+        <div class="row both-margined">
+            <div class="col">
+                <h4>Inherited from @CurrentTestMap.MapName</h4>
+            </div>
+            
+            <div class="col-auto">
+                <button class="d-inline btn btn-secondary ml-8" @onclick="@(() => _navigator.NavigateTo($"/TestMap?CurrentMapId={CurrentTestMap.MapId}"))">
+                    <span class="oi oi-pencil"></span>
+                </button>
+                
+                <button class="d-inline btn btn-danger ml-8" @onclick="RemoveTestMap">
+                    <span>&times;</span>
+                </button>
+            </div>
+        </div>
+        
+        <div class="row">
+            @if (CurrentTestMap.TestCases.Count == 0)
+            {
+                <div class="fs-20 p-2 mb-2 mt-2 border rounded">There're no test cases</div>
+            }
+            else
+            {
+                foreach (var testCase in CurrentTestMap.TestCases)
+                {
+                    <TestCaseView 
+                        CurrentTestCase="testCase" 
+                        IsOverridable="CanOverrideTestCases"
+                        OnOverrodeAction="tc => OnOverrodeTestCaseAction?.Invoke(tc)" />
+                }
+            }
+            
+            @foreach (var inherition in CurrentTestMap.TestMapInheritionContainerTestMaps)
+            {
+                <TestMapView CurrentMapId="inherition.HoldedTestMapId" IsOverridable="false" />
+            }
+        </div>
+    </div>
+}
+
+
+@code {
+    private int _currentMapId;
+
+    [Parameter]
+    public int CurrentMapId
+    {
+        get => _currentMapId;
+        set
+        {
+            _currentMapId = value;
+            LoadTestMap();
+        }
+    }
+
+    [Parameter]
+    public bool CanOverrideTestCases { get; set; } = true;
+    
+    [Parameter] 
+    public Action<TestCase>? OnOverrodeTestCaseAction { get; set; }
+    
+    [Parameter]
+    public Action<TestMap>? OnRemovedTestMap { get; set; }
+    
+    private TestMap? CurrentTestMap { get; set; }
+
+    private void LoadTestMap()
+    {
+        var testMap = OrmManager.Context.TestMaps
+            .Where(m => m.MapId == CurrentMapId)
+            .Include(t => t.TestCases)
+            .Include(t => t.TestMapInheritionContainerTestMaps);
+
+        if (!testMap.Any())
+        {
+            return;
+        }
+
+        CurrentTestMap = testMap.First();
+    }
+
+    private void RemoveTestMap()
+    {
+        OnRemovedTestMap?.Invoke(CurrentTestMap);
+    }
+}

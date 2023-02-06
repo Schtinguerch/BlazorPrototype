@@ -1,0 +1,137 @@
+@using ObjectOrientedTestsCasesPrototype.Model
+
+@if (CurrentTestCase is null)
+{
+    <p>Loading...</p>
+}
+else
+{
+    <div class="row mt-1 mb-1 pt-1 pb-1 border rounded">
+        @if (CurrentTestCase.OverridedCaseId is not null)
+        {
+            <div class="col-auto h-38">
+                @@override:
+            </div>
+            
+            <div class="col-auto">
+                <span>#</span>
+                <span>@CurrentTestCase.OverridedCaseId</span>
+            </div>
+            
+            <div class="col">
+                <button
+                    class="d-inline btn btn-danger ml-8"
+                    style="padding: 3px; font-size: 12px;"
+                    @onclick="CancelOverride">
+                    
+                    Cancel
+                </button>
+            </div>
+            
+            <div class="w-100"></div>
+        }
+        
+        <div class="col-2">
+            <select class="form-control" @bind="TestingTypeId">
+                @foreach (var type in OrmManager.Context.TestingTypes)
+                {
+                    <option value="@type.TypeId">@type.TypeName</option>
+                }
+            </select>
+        </div>
+
+        <div class="col">
+            <textarea type="text" class="form-control h-38" @bind="CurrentTestCase.CheckText"></textarea>
+        </div>
+
+        <div class="col-3">
+            <textarea type="text" class="form-control h-38" @bind="CurrentTestCase.ExpectedResult"></textarea>
+        </div>
+
+        <div class="col-3">
+            <textarea type="text" class="form-control h-38" @bind="CurrentTestCase.Comment"></textarea>
+        </div>
+
+        <div class="col-auto">
+            <button class="d-inline btn btn-danger" @onclick="DeleteTestCase">
+                <span>&times;</span>
+            </button>
+
+            @if (IsOverridable)
+            {
+                <button class="d-inline btn btn-secondary ml-8" @onclick="OverrideTestCase">
+                    <span class="oi oi-fork"></span>
+                </button>
+            }
+        </div>
+    </div>
+}
+
+
+@code {
+    private TestCase? _currentTestCase;
+
+    [Parameter] 
+    public Action? OnDeletedAction { get; set; }
+    
+    [Parameter]
+    public Action<TestCase>? OnOverrodeAction { get; set; }
+    
+    [Parameter]
+    public TestCase? CurrentTestCase
+    {
+        get => _currentTestCase;
+        set
+        {
+            _currentTestCase = value;
+            if (value is null)
+            {
+                return;
+            }
+
+            TestingTypeId = _currentTestCase.TypeId;
+        }
+    }
+
+    [Parameter]
+    public bool IsOverridable { get; set; } = true;
+
+    private int _testingTypeId;
+
+    private int TestingTypeId
+    {
+        get => _testingTypeId;
+        set
+        {
+            if (_testingTypeId == value)
+            {
+                return;
+            }
+            
+            _testingTypeId = value;
+            CurrentTestCase.Type = OrmManager.Context.TestingTypes.Single(t => t.TypeId == value);
+        }
+    }
+
+    private void DeleteTestCase()
+    {
+        CurrentTestCase.TestMap.TestCases.Remove(CurrentTestCase);
+        OrmManager.Context.TestCases.Remove(CurrentTestCase);
+        OrmManager.Context.SaveChanges();
+        
+        OnDeletedAction?.Invoke();
+    }
+
+    private void OverrideTestCase()
+    {
+        OnOverrodeAction?.Invoke(CurrentTestCase);
+    }
+
+    private void CancelOverride()
+    {
+        CurrentTestCase.OverridedCase = null;
+        CurrentTestCase.OverridedCaseId = null;
+        
+        OrmManager.Context.SaveChanges();
+    }
+}
