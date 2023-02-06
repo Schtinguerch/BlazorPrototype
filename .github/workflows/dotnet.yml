@@ -27,7 +27,7 @@ jobs:
     - name: Test
       run: dotnet test --no-build --verbosity normal
     - name: Publish .NET Project
-      run: dotnet publish BlazorGitHubPagesDemo.csproj -c Release --output release --nologo
+      run: dotnet publish ObjectOrientedTestsCasesPrototype.csproj -c Release --output release --nologo
     - name: Uploading files to gh-pages branch
       uses: JamesIves/github-pages-deploy-action@4.1.4
       with:
